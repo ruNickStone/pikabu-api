@@ -193,28 +193,23 @@ class PikabuUserInfo(PikaService):
         _ = self.html.find('div', 'awards_wrap').findAll('img')
         return list(map(lambda x: (x['title'], x['src']), _))
 
-    def parse_date(self, date):
-        if 'сегодня' in date:
-            return str(datetime.date.today())
-        part_str = date.split()
-        digits = []
-        for i, x in enumerate(part_str):
-            if x.isdigit():
-                digits.append((int(x), i))
-        year, month, day = 1, 1, 1
-        for x, y in digits:
-            if part_str[y+1].startswith('ле') or part_str[y+1].startswith('го'):
-                year = x
-            elif part_str[y+1].startswith('ме'):
-                month = x
-            elif part_str[y+1].startswith('не'):
-                day += 7*x
-            elif part_str[y+1].startswith('дн'):
-                day += x
-        today = datetime.date.today()
-        diff = datetime.date(today.year - 1, today.month - 1, today.day - 1) - datetime.date(year, month, day)
-        _ = str(datetime.date(1, 1, 1)+datetime.timedelta(diff.days))
-        return calendar.timegm(datetime.datetime.strptime(_, '%Y-%m-%d').utctimetuple())
+    def parse_date(date):
+    if 'сегодня' in date:
+        return calendar.timegm(datetime.datetime.today().utctimetuple())
+    part_str = date.split()
+    year, month, day = 1, 1, 1
+    for val, index in [(int(x), i) for i, x in enumerate(part_str) if x.isdigit()]:
+        if part_str[index+1].startswith('ле') or part_str[index+1].startswith('го'):
+            year += val
+        elif part_str[index+1].startswith('ме'):
+            month += val
+        elif part_str[index+1].startswith('не'):
+            day += 7*val
+        elif part_str[index+1].startswith('дн') or part_str[index+1].startswith('де'):
+            day += val
+    diff = datetime.datetime.today()-datetime.datetime(year, month, day)
+    reg_date = datetime.datetime(1, 1, 1)+datetime.timedelta(diff.days)
+    return calendar.timegm(reg_date.utctimetuple())
 
 class PikabuProfile(PikabuUserInfo):
     """Профиль авторизованного пользователя"""
