@@ -50,20 +50,16 @@ class PikaService(object):
                 raise ValueError(['error'])
             IS_LOGGED = True
 
-        if url is not None:
-            if method == 'POST':
-                if data is not None and len(data) > 0:
-                    r = PIKABU_SESS.post(SITE_URL + url, headers=post_headers, data=data, cookies={'PHPSESS': XCSRF_TOKEN})
-                else:
-                    return False
-            elif method == 'GET':
-                r = PIKABU_SESS.get(SITE_URL + url, headers=custom_headers, params=data, cookies={'PHPSESS': XCSRF_TOKEN})
-            else:
-                return False
+        req = requests.Request(method, SITE_URL + url,
+            data = data,
+            headers = custom_headers if(custom_headers is not None) else post_headers,
+            cookies = {'PHPSESS': XCSRF_TOKEN}
+        )
+        prepped = req.prepare()
+        resp = PIKABU_SESS.send(prepped)
+        resp.raise_for_status()
 
-            return r.text
-        else:
-            return False
+        return resp.text
 
 
 class PikabuPosts(PikaService):
@@ -165,7 +161,7 @@ class PikabuUserInfo(PikaService):
         self.info = self.html.find('div', {'style':'padding-top: 0px; line-height: 15px;'}).text.split('\n')
 
         return ObjectUserInfo(login, self.get_dor(),
-            self.get_rating(), self.get_comments(), self.get_avatar(),
+            self.get_rating(), self.get_avatar(), self.get_comments(),
             self.get_news(), self.get_actions(), self.get_awards())
 
     def get_dor(self):
