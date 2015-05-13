@@ -65,7 +65,7 @@ class PikaService(object):
 class PikabuPosts(PikaService):
 
     def rate(self, action, post_id):
-        if post_id is not None:
+        if post_id:
             if action == '+' or action == 1:
                 act = '+'
             elif action == '-' or action == 0:
@@ -81,14 +81,14 @@ class PikabuPosts(PikaService):
             page = self.request('ajax/dig.php', method='POST', data=rate_data)
             return page
         else:
-            return False
+            raise ValueError('Invalid post ID')
         
 
 
 class PikabuComments(PikaService):
 
     def get(self, post_id):
-        if post_id is not None:
+        if post_id:
             page = self.request('generate_xml_comm.php?id=%i' % post_id, need_auth=False)
             comment_list = []
             xml = BeautifulSoup(page)
@@ -101,10 +101,10 @@ class PikabuComments(PikaService):
                                                    comment_date, comment.text))
             return comment_list
         else:
-            return False
+            raise ValueError('Invalid post ID')
 
     def add(self, text, post_id, parent_id=0):
-        if post_id and text is not None:
+        if post_id and text:
             comment_data = {
                 'act': 'addcom',
                 'id': post_id,
@@ -118,16 +118,16 @@ class PikabuComments(PikaService):
             response = json.loads(page)
             return True if(response['type'] == 'done') else response['text']
         else:
-            return False
+            raise ValueError('Invalid post ID or text comment')
 
     def rate(self, action, post_id, comment_id):
-        if comment_id and post_id is not None:
+        if comment_id and post_id:
             if action == '+' or action == 1:
                 act = 1
             elif action == '-' or action == 0:
                 act = 0
             else:
-                return False
+                raise ValueError('Invalid action')
 
             referer = requests.head('%s/story/_%i' % (SITE_URL, post_id), allow_redirects=False).headers['location']
             custom_headers = {
@@ -147,7 +147,7 @@ class PikabuComments(PikaService):
             page = self.request('dig.php', data=rate_data, custom_headers=custom_headers, referer=referer)
             return page
         else:
-            return False
+            raise ValueError('Invalid post or comment ID')
 
 class PikabuUserInfo(PikaService):
     def __init__(self, **settings):
