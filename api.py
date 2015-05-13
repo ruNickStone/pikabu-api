@@ -20,7 +20,7 @@ class PikaService(object):
             raise ValueError('Не указан логин и пароль')
         self.settings = settings
 
-    def request(self, url, data=None, method='POST', referer=SITE_URL, custom_headers=None, need_auth=True):
+    def request(self, url, data=None, method='GET', referer=SITE_URL, custom_headers=None, need_auth=True):
         global IS_LOGGED
         XCSRF_TOKEN = requests.get(SITE_URL).cookies['PHPSESS']
         post_headers = {
@@ -68,10 +68,24 @@ class PikaService(object):
 
 class PikabuPosts(PikaService):
 
-    def getById(self, post_id):
-        page = self.request('story/_%i' % post_id, method='GET', need_auth=False)
-        html = BeautifulSoup(page).find('table', {'id' : 'inner_wrap_' % post_id})
-        rating = int(html.find('li', 'b-rating__count curs').text) or None
+    def rate(self, action, post_id):
+        if post_id is not None:
+            if action == '+' or action == 1:
+                act = '+'
+            elif action == '-' or action == 0:
+                act = '-'
+            else:
+                return False
+
+            rate_data = {
+                'i': post_id,
+                'type': act
+            }
+            
+            page = self.request('ajax/dig.php', method='POST', data=rate_data)
+            return page
+        else:
+            return False
         
 
 
@@ -79,7 +93,7 @@ class PikabuComments(PikaService):
 
     def get(self, post_id):
         if post_id is not None:
-            page = self.request('generate_xml_comm.php?id=%i' % post_id, method='GET', need_auth=False)
+            page = self.request('generate_xml_comm.php?id=%i' % post_id, need_auth=False)
             comment_list = []
             xml = BeautifulSoup(page)
             comments = xml.comments.findAll('comment')
@@ -104,7 +118,7 @@ class PikabuComments(PikaService):
                 'comment_images': ''
             }
             referer = requests.head('%s/story/_%i' % (SITE_URL, post_id), allow_redirects=False).headers['location']
-            page = self.request('ajax.php', comment_data, referer=referer)
+            page = self.request('ajax.php', comment_data, method='POST', referer=referer)
             response = json.loads(page)
             return True if(response['type'] == 'done') else response['text']
         else:
@@ -134,7 +148,7 @@ class PikabuComments(PikaService):
                 'dir': act
             }
             
-            page = self.request('dig.php', data=rate_data, custom_headers=custom_headers, referer=referer, method='GET')
+            page = self.request('dig.php', data=rate_data, custom_headers=custom_headers, referer=referer)
             return page
         else:
             return False
@@ -146,7 +160,7 @@ class PikabuUserInfo(PikaService):
         self.settings = settings
 
     def get(self, login):
-        page = self.request('profile/%s' % login, method='GET', need_auth=False)
+        page = self.request('profile/%s' % login, need_auth=False)
         self.html = BeautifulSoup(page).find('div', 'profile_wrap')
         self.info = self.html.find('div', {'style':'padding-top: 0px; line-height: 15px;'}).text.split('\n')
 
@@ -214,7 +228,7 @@ class PikabuProfile(PikabuUserInfo):
 
     def get(self):
         """Возвращает информацию о пользователе"""
-        page = self.request('freshitems.php', method='GET', need_auth=True)
+        page = self.request('freshitems.php', need_auth=True)
         self.html = BeautifulSoup(page)
         profile = PikabuUserInfo()
         profile = profile.get(self.settings['login'])
@@ -230,7 +244,7 @@ class PikabuTopTags(PikaService):
 
     def get(self, limit=10):
         if limit > 0:
-            page = self.request('html.php?id=faq', method='GET')
+            page = self.request('html.php?id=faq')
             tags = BeautifulSoup(page)
             tag_list = list(zip(map(lambda x: x.text, tags.findAll('span', 'tag no_ch')), map(lambda y: int(y.text), tags.findAll('span', 'tag_count'))))
             return tag_list[:limit]
@@ -239,6 +253,7 @@ class PikabuTopTags(PikaService):
 
 
 class ObjectUserInfo():
+
     def __init__(self, login, dor, rating, avatar, comments, news, actions, awards, followers=None):
         self.login = login
         self.dor = dor
@@ -270,3 +285,4 @@ class API:
         self.top_tags = PikabuTopTags(**self.settings)
         self.profile = PikabuProfile(**self.settings)
         self.users = PikabuUserInfo(**self.settings)
+        self.posts = PikabuPosts(**self.settings)
