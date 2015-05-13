@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
+
 import re
 import json
 import calendar
@@ -7,22 +8,31 @@ import requests
 import datetime
 from bs4 import BeautifulSoup
 
-IS_LOGGED = False
-XCSRF_TOKEN = None
-SITE_URL = 'http://pikabu.ru/'
-PIKABU_SESS = requests.Session()
+class API:
 
+    site_url = 'http://pikabu.ru/'
+
+    def __init__(self, **settings):
+        self.settings = settings
+        self.comments = PikabuComments(**self.settings)
+        self.top_tags = PikabuTopTags(**self.settings)
+        self.profile = PikabuProfile(**self.settings)
+        self.users = PikabuUserInfo(**self.settings)
+        self.posts = PikabuPosts(**self.settings)
 
 class PikaService(object):
+
+    pikabu_sess = requests.Session()
 
     def __init__(self, **settings):
         if 'login' not in settings or 'password' not in settings:
             raise ValueError('Не указан логин и пароль')
+        self.is_logged = False
         self.settings = settings
+        self.xcsrf_token = None
 
-    def request(self, url, data=None, method='GET', referer=SITE_URL, custom_headers=None, need_auth=True):
-        global IS_LOGGED
-        XCSRF_TOKEN = requests.get(SITE_URL).cookies['PHPSESS']
+    def request(self, url, data=None, method='GET', referer=API.site_url, custom_headers=None, need_auth=True):
+        self.xcsrf_token = requests.get(API.site_url).cookies['PHPSESS']
         post_headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36',
             'Referer': referer,
@@ -30,11 +40,11 @@ class PikaService(object):
             'Origin': 'http://pikabu.ru',
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
             'Accept': 'application/json, text/javascript, */*; q=0.01',
-            'X-Csrf-Token': XCSRF_TOKEN,
+            'X-Csrf-Token': self.xcsrf_token,
             'X-Requested-With': 'XMLHttpRequest'
         }
 
-        if need_auth and not IS_LOGGED:
+        if need_auth and not self.is_logged:
             login_data = {
                 'mode': 'login',
                 'username': self.settings['login'],
@@ -42,21 +52,26 @@ class PikaService(object):
                 'remember': 0
             }
 
-            r = PIKABU_SESS.post(SITE_URL + 'ajax/ajax_login.php', data=login_data, headers=post_headers, cookies={'PHPSESS': XCSRF_TOKEN})
+            r = self.pikabu_sess.post(
+                API.site_url + 'ajax/ajax_login.php',
+                data=login_data,
+                headers=post_headers,
+                cookies={'PHPSESS': self.xcsrf_token}
+            )
             r = json.loads(r.text)
             if int(r['logined']) == 0:
                 raise ValueError('Неверно указан логин или пароль')
             if int(r['logined']) == -1:
                 raise ValueError(['error'])
-            IS_LOGGED = True
+            self.is_logged = True
 
-        req = requests.Request(method, SITE_URL + url,
+        req = requests.Request(method, API.site_url + url,
             data = data,
             headers = custom_headers if(custom_headers is not None) else post_headers,
-            cookies = {'PHPSESS': XCSRF_TOKEN}
+            cookies = {'PHPSESS': self.xcsrf_token}
         )
         prepped = req.prepare()
-        resp = PIKABU_SESS.send(prepped)
+        resp = self.pikabu_sess.send(prepped)
         resp.raise_for_status()
 
         return resp.text
@@ -113,7 +128,7 @@ class PikabuComments(PikaService):
                 'include': 0,
                 'comment_images': ''
             }
-            referer = requests.head('%s/story/_%i' % (SITE_URL, post_id), allow_redirects=False).headers['location']
+            referer = requests.head('%s/story/_%i' % (API.site_url, post_id), allow_redirects=False).headers['location']
             page = self.request('ajax.php', comment_data, method='POST', referer=referer)
             response = json.loads(page)
             return True if(response['type'] == 'done') else response['text']
@@ -129,7 +144,7 @@ class PikabuComments(PikaService):
             else:
                 raise ValueError('Invalid action')
 
-            referer = requests.head('%s/story/_%i' % (SITE_URL, post_id), allow_redirects=False).headers['location']
+            referer = requests.head('%s/story/_%i' % (API.site_url, post_id), allow_redirects=False).headers['location']
             custom_headers = {
                 'Accept': '*/*',
                 'Host': 'pikabu.ru',
@@ -193,23 +208,23 @@ class PikabuUserInfo(PikaService):
         _ = self.html.find('div', 'awards_wrap').findAll('img')
         return list(map(lambda x: (x['title'], x['src']), _))
 
-    def parse_date(date):
-    if 'сегодня' in date:
-        return calendar.timegm(datetime.datetime.today().utctimetuple())
-    part_str = date.split()
-    year, month, day = 1, 1, 1
-    for val, index in [(int(x), i) for i, x in enumerate(part_str) if x.isdigit()]:
-        if part_str[index+1].startswith('ле') or part_str[index+1].startswith('го'):
-            year += val
-        elif part_str[index+1].startswith('ме'):
-            month += val
-        elif part_str[index+1].startswith('не'):
-            day += 7*val
-        elif part_str[index+1].startswith('дн') or part_str[index+1].startswith('де'):
-            day += val
-    diff = datetime.datetime.today()-datetime.datetime(year, month, day)
-    reg_date = datetime.datetime(1, 1, 1)+datetime.timedelta(diff.days)
-    return calendar.timegm(reg_date.utctimetuple())
+    def parse_date(self, date):
+        if u'сегодня' in date:
+            return calendar.timegm(datetime.datetime.today().utctimetuple())
+        part_str = date.split()
+        year, month, day = 1, 1, 1
+        for val, index in [(int(x), i) for i, x in enumerate(part_str) if x.isdigit()]:
+            if part_str[index+1].startswith(u'ле') or part_str[index+1].startswith(u'го'):
+                year += val
+            elif part_str[index+1].startswith(u'ме'):
+                month += val
+            elif part_str[index+1].startswith(u'не'):
+                day += 7*val
+            elif part_str[index+1].startswith(u'дн') or part_str[index+1].startswith(u'де'):
+                day += val
+        diff = datetime.datetime.today()-datetime.datetime(year, month, day)
+        reg_date = datetime.datetime(1, 1, 1)+datetime.timedelta(diff.days)
+        return calendar.timegm(reg_date.utctimetuple())
 
 class PikabuProfile(PikabuUserInfo):
     """Профиль авторизованного пользователя"""
@@ -266,14 +281,3 @@ class ObjectComments():
         self.answer = answer
         self.date = date
         self.text = text
-
-
-class API:
-
-    def __init__(self, **settings):
-        self.settings = settings
-        self.comments = PikabuComments(**self.settings)
-        self.top_tags = PikabuTopTags(**self.settings)
-        self.profile = PikabuProfile(**self.settings)
-        self.users = PikabuUserInfo(**self.settings)
-        self.posts = PikabuPosts(**self.settings)
