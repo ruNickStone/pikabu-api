@@ -109,7 +109,7 @@ class PikabuPosts(PikaService):
         self.post = None
         self.post_head = None
         self.settings = settings
-        PikaService.__init__(self, **settings)
+        super(PikabuPosts, self).__init__(self, **settings)
 
     def get(self, cat='new', limit=20):
         if not isinstance(limit, int) or limit < 1:
@@ -125,14 +125,12 @@ class PikabuPosts(PikaService):
             posts_list = []
             for post in posts:
                 self.post = post
-                self.post_head =  self.post.find('div', 'b-story__content')
-                posts_list.append(
-                    ObjectPosts(
-                        self.post_id, self.url, self.title, 
-                        self.description, self.content, self.author, 
-                        self.add_date, self.comments, self.rating, self.tag_list
-                        )
-                    )
+                self.post_head = self.post.find('div', 'b-story__content')
+                posts_list.append(ObjectPosts(
+                    self.post_id, self.url, self.title,
+                    self.description, self.content, self.author,
+                    self.add_date, self.comments, self.rating, self.tag_list
+                ))
         return posts_list
 
     @property
@@ -164,7 +162,7 @@ class PikabuPosts(PikaService):
     @property
     def author(self):
         return self.post.find('a', style='padding-right: 0').text
-    
+
     @property
     def add_date(self):
         return self.post.find('a', 'detailDate')['title']
@@ -177,21 +175,20 @@ class PikabuPosts(PikaService):
     def rating(self):
         rating = self.post.find('li', 'curs').text
         return None if(rating.strip() == '') else int(rating)
-    
+
     @property
     def tag_list(self):
         tag_list = self.post.find('span', 'story_tag_list').findAll('a')
-        return list(map(lambda x: x.text, tag_list))
+        return [x.text for x in tag_list]
 
     @property
     def post_type(self):
         if self.post_head['id'][:4] == 'textDiv':
             return 'text'
-        elif post_head['id'][:3] == 'pic':
+        elif self.post_head['id'][:3] == 'pic':
             return 'pic'
         else:
             return 'video'
-
 
     def rate(self, action, post_id):
         if not isinstance(post_id, int) and post_id < 0:
@@ -216,7 +213,7 @@ class PikabuPosts(PikaService):
 class PikabuComments(PikaService):
 
     def __init__(self, **settings):
-        PikaService.__init__(self, **settings)
+        super(PikabuComments, self).__init__(self, **settings)
         self.settings = settings
 
     def get(self, post_id):
@@ -307,7 +304,7 @@ class PikabuUserInfo(PikaService):
     def __init__(self, **settings):
         self.html = None
         self.info = None
-        PikaService.__init__(self, **settings)
+        super(PikabuUserInfo, self).__init__(self, **settings)
         self.settings = settings
 
     def get(self, login):
@@ -349,25 +346,25 @@ class PikabuUserInfo(PikaService):
     @property
     def news(self):
         """Возвращает массив с количеством новостей"""
-        return list(map(int, re.findall(r'\d+', self.info[6])))
+        return map(int, re.findall(r'\d+', self.info[6]))
 
     @property
     def actions(self):
         """Возвращает массив с количество + и - юзера"""
-        return [int(self.info[10].split()[0]), int(self.info[12].split()[0])]
+        return (int(self.info[10].split()[0]), int(self.info[12].split()[0]))
 
     @property
     def awards(self):
         """Возвращает список наград пользователя"""
         _ = self.html.find('div', 'awards_wrap').findAll('img')
-        return list([(x['title'], x['src']) for x in _])
+        return [(x['title'], x['src']) for x in _]
 
 
 class PikabuProfile(PikaService):
 
     def __init__(self, **settings):
         self.html = None
-        PikaService.__init__(self, **settings)
+        super(PikabuProfile, self).__init__(self, **settings)
         self.settings = settings
 
     def get(self):
@@ -396,7 +393,7 @@ class PikabuProfile(PikaService):
 class PikabuTopTags(PikaService):
 
     def __init__(self, **settings):
-        PikaService.__init__(self, **settings)
+        super(PikabuTopTags, self).__init__(self, **settings)
         self.settings = settings
 
     def get(self, limit=10):
@@ -405,17 +402,17 @@ class PikabuTopTags(PikaService):
 
         page = self.request('html.php?id=faq')
         tags = BeautifulSoup(page)
-        tag_list = list(zip(
+        tag_list = zip(
             [x.text for x in tags.findAll('span', 'tag no_ch')],
             [int(y.text) for y in tags.findAll('span', 'tag_count')]
-        ))
+        )
         return tag_list[:limit]
 
 
-class ObjectPosts():
+class ObjectPosts(object):
 
     def __init__(self, post_id, url, title, description,
-        content, author, time, comments, rating, tags):
+                 content, author, time, comments, rating, tags):
         self.id = post_id
         self.url = url
         self.title = title
