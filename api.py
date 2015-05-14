@@ -109,7 +109,7 @@ class PikabuPosts(PikaService):
         self.post = None
         self.post_head = None
         self.settings = settings
-        super(PikabuPosts, self).__init__(self, **settings)
+        super(PikabuPosts, self).__init__(**settings)
 
     def get(self, cat='new', limit=20):
         if not isinstance(limit, int) or limit < 1:
@@ -213,7 +213,7 @@ class PikabuPosts(PikaService):
 class PikabuComments(PikaService):
 
     def __init__(self, **settings):
-        super(PikabuComments, self).__init__(self, **settings)
+        super(PikabuComments, self).__init__(**settings)
         self.settings = settings
 
     def get(self, post_id):
@@ -304,7 +304,7 @@ class PikabuUserInfo(PikaService):
     def __init__(self, **settings):
         self.html = None
         self.info = None
-        super(PikabuUserInfo, self).__init__(self, **settings)
+        super(PikabuUserInfo, self).__init__(**settings)
         self.settings = settings
 
     def get(self, login):
@@ -364,7 +364,7 @@ class PikabuProfile(PikaService):
 
     def __init__(self, **settings):
         self.html = None
-        super(PikabuProfile, self).__init__(self, **settings)
+        super(PikabuProfile, self).__init__(**settings)
         self.settings = settings
 
     def get(self):
@@ -393,7 +393,7 @@ class PikabuProfile(PikaService):
 class PikabuTopTags(PikaService):
 
     def __init__(self, **settings):
-        super(PikabuTopTags, self).__init__(self, **settings)
+        super(PikabuTopTags, self).__init__(**settings)
         self.settings = settings
 
     def get(self, limit=10):
